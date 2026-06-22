@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>機器貓的百寶注音大冒險</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #00A0E9; /* Doraemon Blue */
+            background-image: radial-gradient(#ffffff 15%, transparent 16%), radial-gradient(#ffffff 15%, transparent 16%);
+            background-size: 60px 60px;
+            background-position: 0 0, 30px 30px;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+        .wood-pattern {
+            background-color: #eab676;
+            background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.05) 10px, rgba(0,0,0,0.05) 20px);
+        }
+        .animate-bounce-custom {
+            animation: bounce 2s ease-in-out infinite;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(-3%); }
+            50% { transform: translateY(3%); }
+        }
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+        .flip-card {
+            perspective: 1000px;
+        }
+        .flip-card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        .flip-card.flipped .flip-card-inner {
+            transform: rotateY(180deg);
+        }
+        .flip-card-front, .flip-card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .flip-card-front {
+            background-color: #D2B48C; 
+            border: 4px solid #8B4513;
+        }
+        .flip-card-back {
+            background-color: white;
+            border: 4px solid #3B82F6;
+            transform: rotateY(180deg);
+        }
+        /* Custom Sparkle Animation */
+        @keyframes sparkle {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+        .animate-sparkle {
+            animation: sparkle 1.5s infinite;
+        }
+        /* Hide scrollbar */
+        ::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+        const apiKey = ""; // API key injected by environment
+
+        // --- Data Pools ---
+
+        const zhuyinSymbolsPool = [
+            'ㄅ','ㄆ','ㄇ','ㄈ','ㄉ','ㄊ','ㄋ','ㄌ','ㄍ','ㄎ','ㄏ',
+            'ㄐ','ㄑ','ㄒ','ㄓ','ㄔ','ㄕ','ㄖ','ㄗ','ㄘ','ㄙ',
+            'ㄧ','ㄨ','ㄩ','ㄚ','ㄛ','ㄜ','ㄝ','ㄞ','ㄟ','ㄠ','ㄡ',
+            'ㄢ','ㄣ','ㄤ','ㄥ','ㄦ'
+        ];
+
+        const readingPool = [
+            { q: '貓', a: 'ㄇㄠ', d: ['ㄍㄡ','ㄋㄧㄠˇ','ㄩˊ'] },
+            { q: '狗', a: 'ㄍㄡˇ', d: ['ㄇㄠ','ㄓㄨ','ㄧㄤˊ'] },
+            { q: '魚', a: 'ㄩˊ', d: ['ㄒㄧㄚ','ㄍㄨㄟ','ㄋㄧㄠˇ'] },
+            { q: '鳥', a: 'ㄋㄧㄠˇ', d: ['ㄐㄧ','ㄧㄚ','ㄜˊ'] },
+            { q: '牛', a: 'ㄋㄧㄡˊ', d: ['ㄇㄚˇ','ㄧㄤˊ','ㄌㄨˋ'] },
+            { q: '馬', a: 'ㄇㄚˇ', d: ['ㄋㄧㄡˊ','ㄌㄩˊ','ㄏㄡˊ'] },
+            { q: '羊', a: 'ㄧㄤˊ', d: ['ㄋㄧㄡˊ','ㄓㄨ','ㄊㄨˋ'] },
+            { q: '豬', a: 'ㄓㄨ', d: ['ㄍㄡˇ','ㄇㄠ','ㄕㄨˇ'] },
+            { q: '雞', a: 'ㄐㄧ', d: ['ㄧㄚ','ㄜˊ','ㄋㄧㄠˇ'] },
+            { q: '鴨', a: 'ㄧㄚ', d: ['ㄐㄧ','ㄜˊ','ㄩˊ'] },
+            { q: '兔', a: 'ㄊㄨˋ', d: ['ㄕㄨˇ','ㄏㄡˊ','ㄓㄨ'] },
+            { q: '山', a: 'ㄕㄢ', d: ['ㄕㄨㄟˇ','ㄕˊ','ㄊㄨˇ'] },
+            { q: '水', a: 'ㄕㄨㄟˇ', d: ['ㄏㄨㄛˇ','ㄈㄥ','ㄊㄨˇ'] },
+            { q: '火', a: 'ㄏㄨㄛˇ', d: ['ㄕㄨㄟˇ','ㄇㄨˋ','ㄐㄧㄣ'] },
+            { q: '花', a: 'ㄏㄨㄚ', d: ['ㄘㄠˇ','ㄕㄨˋ','ㄧㄝˋ'] },
+            { q: '草', a: 'ㄘㄠˇ', d: ['ㄏㄨㄚ','ㄕㄨˋ','ㄍㄣ'] },
+            { q: '樹', a: 'ㄕㄨˋ', d: ['ㄏㄨㄚ','ㄧㄝˋ','ㄍㄣ'] },
+            { q: '爸', a: 'ㄅㄚˋ', d: ['ㄇㄚ','ㄧㄝˊ','ㄋㄞˇ'] },
+            { q: '媽', a: 'ㄇㄚ', d: ['ㄅㄚˋ','ㄐㄧㄝˇ','ㄇㄟˋ'] },
+            { q: '手', a: 'ㄕㄡˇ', d: ['ㄐㄧㄠˇ','ㄊㄡˊ','ㄕㄣ'] },
+            { q: '足', a: 'ㄗㄨˊ', d: ['ㄕㄡˇ','ㄊㄡˊ','ㄇㄧㄢˋ'] },
+            { q: '口', a: 'ㄎㄡˇ', d: ['ㄦˇ','ㄇㄨˋ','ㄅㄧˊ'] },
+            { q: '耳', a: 'ㄦˇ', d: ['ㄇㄨˋ','ㄎㄡˇ','ㄅㄧˊ'] },
+            { q: '目', a: 'ㄇㄨˋ', d: ['ㄦˇ','ㄎㄡˇ','ㄕㄡˇ'] },
+            { q: '心', a: 'ㄒㄧㄣ', d: ['ㄕㄣ','ㄕㄡˇ','ㄊㄡˊ'] },
+            { q: '牙', a: 'ㄧㄚˊ', d: ['ㄕㄜˊ','ㄗㄨㄟˇ','ㄌㄧㄢˇ'] },
+            { q: '大', a: 'ㄉㄚˋ', d: ['ㄒㄧㄠˇ','ㄉㄨㄛ','ㄕㄠˇ'] },
+            { q: '小', a: 'ㄒㄧㄠˇ', d: ['ㄉㄚˋ','ㄉㄨㄛ','ㄕㄠˇ'] },
+            { q: '紅', a: 'ㄏㄨㄥˊ', d: ['ㄌㄢˊ','ㄌㄩˋ','ㄅㄞˊ'] },
+            { q: '白', a: 'ㄅㄞˊ', d: ['ㄏㄟ','ㄏㄨㄥˊ','ㄌㄢˊ'] },
+            { q: '黑', a: 'ㄏㄟ', d: ['ㄅㄞˊ','ㄏㄨㄥˊ','ㄌㄩˋ'] },
+            { q: '藍', a: 'ㄌㄢˊ', d: ['ㄏㄨㄥˊ','ㄏㄟ','ㄅㄞˊ'] },
+            { q: '書', a: 'ㄕㄨ', d: ['ㄅㄧˇ','ㄓˇ','ㄅㄠ'] },
+            { q: '筆', a: 'ㄅㄧˇ', d: ['ㄕㄨ','ㄓˇ','ㄔˇ'] },
+            { q: '車', a: 'ㄔㄜ', d: ['ㄔㄨㄢˊ','ㄈㄟ','ㄐㄧ'] },
+            { q: '船', a: 'ㄔㄨㄢˊ', d: ['ㄔㄜ','ㄈㄟ','ㄐㄧ'] },
+            { q: '門', a: 'ㄇㄣˊ', d: ['ㄔㄨㄤ','ㄏㄨˋ','ㄑㄧㄤˊ'] },
+            { q: '燈', a: 'ㄉㄥ', d: ['ㄏㄨㄛˇ','ㄍㄨㄤ','ㄌㄧㄤˋ'] },
+            { q: '球', a: 'ㄑㄧㄡˊ', d: ['ㄨㄢˊ','ㄑㄩㄢ','ㄌㄨㄣˊ'] },
+            { q: '衣', a: 'ㄧ', d: ['ㄎㄨˋ','ㄒㄧㄝˊ','ㄇㄠˋ'] },
+            { q: '飯', a: 'ㄈㄢˋ', d: ['ㄇㄧㄢˋ','ㄘㄞˋ','ㄊㄤ'] },
+            { q: '麵', a: 'ㄇㄧㄢˋ', d: ['ㄈㄢˋ','ㄅㄠ','ㄐㄧㄠˇ'] },
+            { q: '蛋', a: 'ㄉㄢˋ', d: ['ㄖㄡˋ','ㄩˊ','ㄘㄞˋ'] },
+            { q: '瓜', a: 'ㄍㄨㄚ', d: ['ㄍㄨㄛˇ','ㄉㄡˋ','ㄘㄞˋ'] },
+            { q: '跑', a: 'ㄆㄠˇ', d: ['ㄊㄧㄠˋ','ㄗㄡˇ','ㄈㄟ'] },
+            { q: '跳', a: 'ㄊㄧㄠˋ', d: ['ㄆㄠˇ','ㄗㄡˇ','ㄗㄨㄛˋ'] },
+            { q: '飛', a: 'ㄈㄟ', d: ['ㄆㄠˇ','ㄧㄡˊ','ㄆㄚˊ'] },
+            { q: '吃', a: 'ㄔ', d: ['ㄏㄜ','ㄨㄢˊ','ㄕㄨㄟˋ'] },
+            { q: '喝', a: 'ㄏㄜ', d: ['ㄔ','ㄨㄢˊ','ㄌㄜˋ'] },
+            { q: '睡', a: 'ㄕㄨㄟˋ', d: ['ㄒㄧㄥˇ','ㄑㄧˇ','ㄗㄨㄛˋ'] },
+            { q: '笑', a: 'ㄒㄧㄠˋ', d: ['ㄎㄨ','ㄋㄨˋ','ㄏㄢˇ'] },
+            { q: '哭', a: 'ㄎㄨ', d: ['ㄒㄧㄠˋ','ㄌㄜˋ','ㄒㄧˇ'] },
+            { q: '我', a: 'ㄨㄛˇ', d: ['ㄋㄧˇ','ㄊㄚ','ㄕㄟˊ'] },
+            { q: '你', a: 'ㄋㄧˇ', d: ['ㄨㄛˇ','ㄊㄚ','ㄕㄟˊ'] },
+            { q: '爺', a: 'ㄧㄝˊ', d: ['ㄋㄞˇ','ㄅㄚˋ','ㄍㄜ'] },
+            { q: '奶', a: 'ㄋㄞˇ', d: ['ㄧㄝˊ','ㄇㄚ','ㄆㄛˊ'] },
+            { q: '弟', a: 'ㄉㄧˋ', d: ['ㄍㄜ','ㄇㄟˋ','ㄐㄧㄝˇ'] },
+            { q: '妹', a: 'ㄇㄟˋ', d: ['ㄐㄧㄝˇ','ㄇㄚ','ㄋㄞˇ'] },
+            { q: '男', a: 'ㄋㄢˊ', d: ['ㄋㄩˇ','ㄌㄠˇ','ㄕㄠˋ'] },
+            { q: '女', a: 'ㄋㄩˇ', d: ['ㄋㄢˊ','ㄌㄠˇ','ㄕㄠˋ'] },
+            { q: '月', a: 'ㄩㄝˋ', d: ['ㄖˋ','ㄒㄧㄥ','ㄎㄨㄥ'] },
+            { q: '日', a: 'ㄖˋ', d: ['ㄩㄝˋ','ㄒㄧㄥ','ㄩㄣˊ'] },
+            { q: '雨', a: 'ㄩˇ', d: ['ㄈㄥ','ㄒㄩㄝˇ','ㄩㄣˊ'] },
+            { q: '風', a: 'ㄈㄥ', d: ['ㄩˇ','ㄌㄟˊ','ㄉㄧㄢˋ'] },
+            { q: '電', a: 'ㄉㄧㄢˋ', d: ['ㄌㄟˊ','ㄩˇ','ㄈㄥ'] },
+            { q: '石', a: 'ㄕˊ', d: ['ㄊㄨˇ','ㄕㄢ','ㄕㄚ'] },
+            { q: '田', a: 'ㄊㄧㄢˊ', d: ['ㄉㄧˋ','ㄊㄨˇ','ㄕㄢ'] },
+            { q: '土', a: 'ㄊㄨˇ', d: ['ㄕˊ','ㄕㄚ','ㄋㄧˊ'] }
+        ];
+
+        const tonePool = [
+            { word: '媽', hint: '媽媽', answerType: 1, answerSymbol: '—', distractors: [2, 3, 4] },
+            { word: '飛', hint: '飛機', answerType: 1, answerSymbol: '—', distractors: [2, 3, 4] },
+            { word: '麻', hint: '麻煩', answerType: 2, answerSymbol: 'ˊ', distractors: [1, 3, 4] },
+            { word: '魚', hint: '小魚', answerType: 2, answerSymbol: 'ˊ', distractors: [1, 3, 4] },
+            { word: '馬', hint: '騎馬', answerType: 3, answerSymbol: 'ˇ', distractors: [1, 2, 4] },
+            { word: '狗', hint: '小狗', answerType: 3, answerSymbol: 'ˇ', distractors: [1, 2, 4] },
+            { word: '罵', hint: '罵人', answerType: 4, answerSymbol: 'ˋ', distractors: [1, 2, 3] },
+            { word: '兔', hint: '兔子', answerType: 4, answerSymbol: 'ˋ', distractors: [1, 2, 3] },
+            { word: '們', hint: '我們', answerType: 5, answerSymbol: '˙', distractors: [2, 3, 4] },
+            { word: '的', hint: '我的', answerType: 5, answerSymbol: '˙', distractors: [2, 3, 4] }
+        ];
+
+        const toneSymbols = { 1: '一聲', 2: 'ˊ', 3: 'ˇ', 4: 'ˋ', 5: '˙' };
+
+        // Helper for Level 4
+        const decomposeZhuyin = (zhuyinStr) => {
+            if (!zhuyinStr) return [' ', ' ', ' '];
+            const toneMap = { 'ˊ': 'ˊ', 'ˇ': 'ˇ', 'ˋ': 'ˋ', '˙': '˙' };
+            let parts = [];
+            let tone = '—'; 
+            
+            let tempStr = zhuyinStr;
+            const lastChar = tempStr.slice(-1);
+            
+            if (toneMap[lastChar]) {
+                tone = lastChar;
+                tempStr = tempStr.slice(0, -1);
+            } else if (tempStr.startsWith('˙')) {
+                tone = '˙';
+                tempStr = tempStr.slice(1);
+            }
+
+            parts = tempStr.split('');
+            return [...parts, tone];
+        };
+
+        // --- Icons ---
+        const IconBell = () => (
+            <svg viewBox="0 0 24 24" fill="#FACC15" className="w-8 h-8 drop-shadow-md">
+                <circle cx="12" cy="12" r="10" stroke="#B45309" strokeWidth="2" />
+                <path d="M4 12H20" stroke="#B45309" strokeWidth="2"/>
+                <circle cx="12" cy="16" r="2" fill="#374151" />
+            </svg>
+        );
+        const IconDorayaki = () => (
+            <svg viewBox="0 0 24 24" className="w-8 h-8 drop-shadow-md">
+                <ellipse cx="12" cy="12" rx="10" ry="8" fill="#D97706" stroke="#92400E" strokeWidth="2"/>
+                <ellipse cx="12" cy="12" rx="8" ry="6" fill="#FCD34D" opacity="0.5"/>
+                <path d="M5 12 Q12 18 19 12" stroke="#92400E" strokeWidth="1" fill="none" opacity="0.5"/>
+            </svg>
+        );
+        const IconDoor = () => (
+            <svg viewBox="0 0 24 24" fill="#EC4899" className="w-12 h-12">
+                <rect x="4" y="2" width="16" height="20" rx="2" stroke="#BE185D" strokeWidth="2" />
+                <circle cx="16" cy="12" r="1.5" fill="#FDE047" stroke="#B45309" strokeWidth="1" />
+                <path d="M4 22H20" stroke="#BE185D" strokeWidth="2"/>
+            </svg>
+        );
+        const IconBook = () => (
+             <svg viewBox="0 0 24 24" fill="#60A5FA" className="w-8 h-8 drop-shadow-md"><path d="M4 6C4 4.89543 4.89543 4 6 4H18C19.1046 4 20 4.89543 20 6V18C20 19.1046 19.1046 20 18 20H6C4.89543 20 4 19.1046 4 18V6Z" stroke="#2563EB" strokeWidth="2" fill="#EFF6FF"/><path d="M12 4V20" stroke="#2563EB" strokeWidth="2"/><path d="M6 8H10" stroke="#2563EB" strokeWidth="2"/><path d="M6 12H10" stroke="#2563EB" strokeWidth="2"/><path d="M6 16H8" stroke="#2563EB" strokeWidth="2"/><path d="M14 8H18" stroke="#2563EB" strokeWidth="2"/><path d="M14 12H18" stroke="#2563EB" strokeWidth="2"/><path d="M14 16H16" stroke="#2563EB" strokeWidth="2"/></svg>
+        );
+        const IconMemoryBread = () => (
+            <svg viewBox="0 0 24 24" className="w-8 h-8 drop-shadow-md"><path d="M6 4H18C19.1 4 20 4.9 20 6V18C20 20.2 18.2 22 16 22H8C5.8 22 4 20.2 4 18V6C4 4.9 4.9 4 6 4Z" fill="#D2B48C" stroke="#8B4513" strokeWidth="2"/><path d="M8 8H16" stroke="#8B4513" strokeWidth="2" opacity="0.5"/><path d="M8 12H16" stroke="#8B4513" strokeWidth="2" opacity="0.5"/><path d="M8 16H16" stroke="#8B4513" strokeWidth="2" opacity="0.5"/></svg>
+        );
+        const IconCrown = () => (
+            <svg viewBox="0 0 24 24" className="w-6 h-6 drop-shadow-sm"><path d="M2 18h20v2H2v-2zm0-2l4-10 4 6 2-4 2 4 4-6 4 10H2z" fill="#FFD700" stroke="#B8860B" strokeWidth="1.5" strokeLinejoin="round"/></svg>
+        );
+        const IconCannon = () => (
+            <svg viewBox="0 0 24 24" className="w-8 h-8 drop-shadow-md"><path d="M3 10L16 6L18 12L5 16Z" fill="#CBD5E1" stroke="#475569" strokeWidth="2"/><path d="M16 6L21 4L22 10L18 12Z" fill="#94A3B8" stroke="#475569" strokeWidth="2"/><circle cx="5" cy="13" r="2" fill="#1E293B"/></svg>
+        );
+        const IconTime = () => (
+            <svg viewBox="0 0 24 24" className="w-6 h-6 text-yellow-800"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" fill="none"/><path d="M12 7v5l3 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+        );
+        const IconMagic = () => (
+            <svg viewBox="0 0 24 24" className="w-8 h-8 drop-shadow-md text-purple-600"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="currentColor" /></svg>
+        );
+        const IconShuffle = () => (
+            <svg viewBox="0 0 24 24" className="w-6 h-6"><path d="M10.59 9.17L5.41 4L4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" fill="currentColor"/></svg>
+        );
+
+        // --- Audio Helper ---
+        const speak = (text) => {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'zh-TW';
+                utterance.rate = 0.8; 
+                utterance.pitch = 1.1; 
+                window.speechSynthesis.speak(utterance);
+            }
+        };
+
+        // --- Gemini Story API ---
+        const generateStory = async (words) => {
+            if (!words || words.length === 0) return "請先選擇一些詞喔！";
+            
+            const prompt = `你是哆啦A夢。請用這幾個詞：[${words.join(', ')}]，為六歲小朋友編一個充滿想像力的超短故事（80字以內）。語氣要親切可愛，用繁體中文。結尾要加一句鼓勵的話。`;
+            
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }]
+                    })
+                });
+                
+                if (!response.ok) throw new Error('API Error');
+                
+                const data = await response.json();
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                return text || "哆啦A夢現在想不到故事，稍後再試試看吧！";
+            } catch (error) {
+                console.error("Gemini Error:", error);
+                return "機器貓的線路好像有點怪怪的，請檢查網路，或者稍後再試試看喔！";
+            }
+        };
+
+        // --- Components ---
+
+        const MainMenu = ({ onStart, onLeaderboard, onTeaching, onStory }) => (
+            <div className="flex flex-col items-center justify-center h-full space-y-6 animate-fade-in p-4 overflow-y-auto">
+                <div className="relative mt-4">
+                    <svg viewBox="0 0 200 200" className="w-48 h-48 drop-shadow-2xl animate-bounce-custom z-10 relative">
+                        <circle cx="100" cy="100" r="95" fill="#00A0E9" stroke="black" strokeWidth="3"/>
+                        <circle cx="100" cy="115" r="75" fill="white" stroke="black" strokeWidth="2"/>
+                        <g transform="translate(0, -10)">
+                            <ellipse cx="82" cy="80" rx="18" ry="22" fill="white" stroke="black" strokeWidth="2"/>
+                            <ellipse cx="118" cy="80" rx="18" ry="22" fill="white" stroke="black" strokeWidth="2"/>
+                            <circle cx="88" cy="85" r="5" fill="black"/>
+                            <circle cx="112" cy="85" r="5" fill="black"/>
+                        </g>
+                        <circle cx="100" cy="105" r="12" fill="#E74C3C" stroke="black" strokeWidth="2"/>
+                        <circle cx="96" cy="101" r="3" fill="white" opacity="0.8"/>
+                        <line x1="100" y1="117" x2="100" y2="150" stroke="black" strokeWidth="2"/>
+                        <path d="M 60 140 Q 100 180 140 140" fill="none" stroke="black" strokeWidth="3" strokeLinecap="round"/>
+                        <g stroke="black" strokeWidth="2" strokeLinecap="round">
+                            <line x1="40" y1="110" x2="80" y2="115"/><line x1="35" y1="125" x2="80" y2="125"/><line x1="40" y1="140" x2="80" y2="135"/>
+                            <line x1="160" y1="110" x2="120" y2="115"/><line x1="165" y1="125" x2="120" y2="125"/><line x1="160" y1="140" x2="120" y2="135"/>
+                        </g>
+                        <path d="M 40 175 Q 100 205 160 175" fill="none" stroke="#E74C3C" strokeWidth="8" strokeLinecap="round" />
+                        <circle cx="100" cy="188" r="10" fill="#F1C40F" stroke="black" strokeWidth="2"/>
+                        <line x1="94" y1="186" x2="106" y2="186" stroke="black" strokeWidth="1.5"/>
+                        <circle cx="100" cy="192" r="2.5" fill="black"/>
+                    </svg>
+                </div>
+
+                <h1 className="text-4xl font-black text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)] text-center tracking-wider">
+                    機器貓<br/>注音大冒險
+                </h1>
+
+                <button onClick={onStart} className="group relative w-64 bg-red-500 hover:bg-red-600 text-white text-2xl font-bold py-4 px-8 rounded-full border-b-8 border-red-800 active:border-b-0 active:translate-y-2 transition-all shadow-xl flex items-center justify-center gap-3">
+                    <IconDoor /> <span>開始闖關</span>
+                </button>
+
+                <div className="flex gap-4">
+                    <button onClick={onTeaching} className="w-40 bg-green-500 hover:bg-green-600 text-white text-xl font-bold py-3 px-4 rounded-full border-b-4 border-green-700 active:border-b-0 active:translate-y-1 transition-all shadow-lg flex items-center justify-center gap-2">
+                        <IconBook /> <span>注音教室</span>
+                    </button>
+                    <button onClick={onLeaderboard} className="w-40 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 text-xl font-bold py-3 px-4 rounded-full border-b-4 border-yellow-700 active:border-b-0 active:translate-y-1 transition-all shadow-lg flex items-center justify-center gap-2">
+                        <IconDorayaki /> <span>排行榜</span>
+                    </button>
+                </div>
+                
+                <button onClick={onStory} className="w-64 bg-purple-500 hover:bg-purple-600 text-white text-xl font-bold py-3 px-6 rounded-full border-b-4 border-purple-800 active:border-b-0 active:translate-y-1 transition-all shadow-lg flex items-center justify-center gap-2 mt-2">
+                    <IconMagic /> <span>✨ AI 故事機</span>
+                </button>
+                
+                <div className="h-8"></div>
+            </div>
+        );
+
+        const LevelSelect = ({ onSelectLevel, onBack }) => {
+            const [highScores, setHighScores] = useState({});
+
+            useEffect(() => {
+                const saved = JSON.parse(localStorage.getItem('doraemon_level_highscores') || '{}');
+                setHighScores(saved);
+            }, []);
+
+            const formatScore = (lvl, score) => {
+                if (!score) return null;
+                if (lvl === 5) return `${score}秒`;
+                return `${score}分`;
+            };
+
+            return (
+                <div className="flex flex-col items-center h-full p-4 pt-6 overflow-y-auto">
+                    <button onClick={onBack} className="self-start mb-2 bg-white/20 p-2 rounded-full text-white hover:bg-white/30">⬅ 回首頁</button>
+                    <h2 className="text-3xl font-bold text-white mb-6 drop-shadow-md">選擇關卡</h2>
+                    
+                    <div className="grid gap-4 w-full max-w-md pb-8">
+                        <LevelCard title="聽音辨位" desc="聽聲音，選注音" color="bg-pink-400" icon="👂" onClick={() => onSelectLevel(1)} highScore={formatScore(1, highScores[1])} />
+                        <LevelCard title="識字大考驗" desc="看國字，選拼音" color="bg-green-400" icon="👀" onClick={() => onSelectLevel(2)} highScore={formatScore(2, highScores[2])} />
+                        <LevelCard title="聲調指揮家" desc="聽發音，找聲調" color="bg-purple-400" icon="🎵" onClick={() => onSelectLevel(3)} highScore={formatScore(3, highScores[3])} />
+                        <LevelCard title="拼音大師" desc="組合聲母韻母" color="bg-orange-400" icon={<IconCannon/>} onClick={() => onSelectLevel(4)} highScore={formatScore(4, highScores[4])} />
+                        <LevelCard title="記憶吐司" desc="翻牌配對 (計時)" color="bg-[#D2B48C]" icon={<IconMemoryBread/>} onClick={() => onSelectLevel(5)} highScore={formatScore(5, highScores[5])} />
+                    </div>
+                </div>
+            );
+        };
+
+        const LevelCard = ({ title, desc, color, icon, onClick, highScore }) => (
+            <button onClick={onClick} className={`${color} w-full p-4 rounded-3xl border-4 border-white shadow-lg transform hover:scale-105 transition-transform flex items-center gap-4 text-left relative overflow-hidden`}>
+                {highScore && (
+                    <div className="absolute top-0 right-0 bg-yellow-300 px-3 py-1 rounded-bl-xl border-l-2 border-b-2 border-yellow-600 flex items-center gap-1 shadow-sm z-10">
+                        <IconCrown />
+                        <span className="font-black text-yellow-800 text-sm">{highScore}</span>
+                    </div>
+                )}
+                <div className="bg-white w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-inner border-2 border-gray-100 shrink-0">
+                    {typeof icon === 'string' ? icon : icon}
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold text-white drop-shadow-sm">{title}</h3>
+                    <p className="text-white/90 font-medium text-sm">{desc}</p>
+                </div>
+                <div className="ml-auto bg-white/20 rounded-full p-1"><svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7"></path></svg></div>
+            </button>
+        );
+
+        const GameScreen = ({ levelMode, onEndGame, onBack }) => {
+            const [currentQIndex, setCurrentQIndex] = useState(0);
+            const [score, setScore] = useState(0);
+            const [questions, setQuestions] = useState([]);
+            const [feedback, setFeedback] = useState(null); 
+            const [selectedOption, setSelectedOption] = useState(null);
+            
+            // Level 4 Specific
+            const [pinyinSlots, setPinyinSlots] = useState([]); 
+            
+            // Level 5 Specific
+            const [cards, setCards] = useState([]);
+            const [flippedIndices, setFlippedIndices] = useState([]);
+            const [matchedIds, setMatchedIds] = useState([]);
+            const [timer, setTimer] = useState(0);
+            const timerRef = useRef(null);
+
+            useEffect(() => {
+                let gameQuestions = [];
+                // Reset common states
+                setScore(0);
+                setCurrentQIndex(0);
+                setFeedback(null);
+                setFlippedIndices([]);
+                setMatchedIds([]);
+                setTimer(0);
+                setPinyinSlots([]);
+                if (timerRef.current) clearInterval(timerRef.current);
+
+                if (levelMode === 1) {
+                    const shuffledSymbols = [...zhuyinSymbolsPool].sort(() => 0.5 - Math.random());
+                    gameQuestions = shuffledSymbols.slice(0, 10).map((sym, idx) => {
+                        const distractors = [];
+                        while(distractors.length < 3) {
+                            const r = zhuyinSymbolsPool[Math.floor(Math.random() * zhuyinSymbolsPool.length)];
+                            if (r !== sym && !distractors.includes(r)) distractors.push(r);
+                        }
+                        return { id: idx, answer: sym, distractors };
+                    });
+                } else if (levelMode === 2) {
+                    gameQuestions = [...readingPool].sort(() => 0.5 - Math.random()).slice(0, 10).map((item, index) => ({
+                        id: index, question: item.q, answer: item.a, distractors: item.d
+                    }));
+                } else if (levelMode === 3) {
+                    gameQuestions = [...tonePool].sort(() => 0.5 - Math.random()).slice(0, 10);
+                } else if (levelMode === 4) { // Pinyin Master
+                    gameQuestions = [...readingPool].sort(() => 0.5 - Math.random()).slice(0, 5).map((item, index) => {
+                        const parts = decomposeZhuyin(item.a);
+                        const distractors = [];
+                        while(distractors.length < 3) {
+                            const r = zhuyinSymbolsPool[Math.floor(Math.random() * zhuyinSymbolsPool.length)];
+                            if (!parts.includes(r) && !distractors.includes(r)) distractors.push(r);
+                        }
+                        if(!parts.includes('ˊ')) distractors.push('ˊ');
+                        
+                        return { 
+                            id: index, 
+                            word: item.q, 
+                            parts: parts, 
+                            options: [...parts, ...distractors].sort(() => 0.5 - Math.random())
+                        };
+                    });
+                } else if (levelMode === 5) { // Memory Match
+                    const selectedPairs = [...readingPool].sort(() => 0.5 - Math.random()).slice(0, 8); 
+                    let deck = [];
+                    selectedPairs.forEach((item, idx) => {
+                        deck.push({ id: idx, content: item.q, type: 'char', matchId: idx });
+                        deck.push({ id: idx, content: item.a, type: 'zhuyin', matchId: idx });
+                    });
+                    setCards(deck.sort(() => 0.5 - Math.random()));
+                    timerRef.current = setInterval(() => {
+                        setTimer(t => t + 1);
+                    }, 1000);
+                }
+
+                setQuestions(gameQuestions);
+            }, [levelMode]);
+
+            useEffect(() => {
+                if (levelMode !== 5 && questions.length > 0 && !feedback && questions[currentQIndex]) {
+                    const q = questions[currentQIndex];
+                    if (q) {
+                        setTimeout(() => {
+                            if (levelMode === 1 && q.answer) speak(q.answer);
+                            if (levelMode === 3 && q.word) speak(`${q.word}。 ${q.hint}`);
+                            if (levelMode === 4 && q.word) speak(q.word);
+                        }, 500);
+                    }
+                }
+            }, [currentQIndex, questions, feedback, levelMode]);
+
+            const currentQ = questions[currentQIndex];
+
+            const isDataReady = useMemo(() => {
+                if (levelMode === 5) return cards.length > 0;
+                if (!currentQ) return false;
+                if (levelMode === 1 && !currentQ.answer) return false;
+                if (levelMode === 2 && !currentQ.question) return false;
+                if (levelMode === 3 && !currentQ.word) return false;
+                if (levelMode === 4 && !currentQ.parts) return false;
+                return true;
+            }, [currentQ, levelMode, cards]);
+
+            if (!isDataReady) {
+                return <div className="text-white text-2xl p-10 text-center font-bold animate-pulse">機器貓正在準備道具...</div>;
+            }
+
+            const handleOptionClick = (opt) => {
+                if (feedback) return;
+                setSelectedOption(opt);
+
+                let isCorrect = false;
+                if (levelMode <= 2) isCorrect = opt === currentQ.answer;
+                else if (levelMode === 3) isCorrect = opt === currentQ.answerType;
+
+                if (isCorrect) {
+                    setFeedback('correct');
+                    speak("答對了！");
+                    setScore(s => s + 10);
+                } else {
+                    setFeedback('wrong');
+                    speak("再接再厲！");
+                }
+
+                setTimeout(() => {
+                    if (currentQIndex < questions.length - 1) {
+                        setCurrentQIndex(prev => prev + 1);
+                        setFeedback(null);
+                        setSelectedOption(null);
+                    } else {
+                        onEndGame(score + (isCorrect ? 10 : 0));
+                    }
+                }, 1500);
+            };
+
+            const handlePinyinClick = (val) => {
+                if (feedback) return;
+                speak(val === '—' ? '一聲' : val);
+                const newSlots = [...pinyinSlots, val];
+                setPinyinSlots(newSlots);
+
+                if (newSlots.length === currentQ.parts.length) {
+                    const answerStr = currentQ.parts.join('');
+                    const inputStr = newSlots.join('');
+                    
+                    if (answerStr === inputStr) {
+                        setFeedback('correct');
+                        speak("答對了！");
+                        setScore(s => s + 20); 
+                        setTimeout(() => {
+                            if (currentQIndex < questions.length - 1) {
+                                setCurrentQIndex(prev => prev + 1);
+                                setFeedback(null);
+                                setPinyinSlots([]);
+                            } else {
+                                onEndGame(score + 20);
+                            }
+                        }, 1500);
+                    } else {
+                        setFeedback('wrong');
+                        speak("不對喔");
+                        setTimeout(() => {
+                            setFeedback(null);
+                            setPinyinSlots([]); 
+                        }, 1000);
+                    }
+                }
+            };
+
+            const handleCardClick = (index) => {
+                if (flippedIndices.length >= 2 || flippedIndices.includes(index) || matchedIds.includes(cards[index].matchId)) return;
+
+                speak(cards[index].content);
+                const newFlipped = [...flippedIndices, index];
+                setFlippedIndices(newFlipped);
+
+                if (newFlipped.length === 2) {
+                    const card1 = cards[newFlipped[0]];
+                    const card2 = cards[newFlipped[1]];
+
+                    if (card1.matchId === card2.matchId) {
+                        setTimeout(() => {
+                            setMatchedIds(prev => [...prev, card1.matchId]);
+                            setFlippedIndices([]);
+                            speak("好棒！");
+                            
+                            if (matchedIds.length + 1 === cards.length / 2) {
+                                clearInterval(timerRef.current);
+                                setTimeout(() => onEndGame(timer), 1000);
+                            }
+                        }, 800);
+                    } else {
+                        setTimeout(() => {
+                            setFlippedIndices([]);
+                        }, 1000);
+                    }
+                }
+            };
+
+            if (levelMode === 5) {
+                return (
+                    <div className="flex flex-col h-full relative">
+                        <div className="flex justify-between items-center p-4">
+                            <button onClick={onBack} className="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold border-b-2 border-red-800">退出</button>
+                            <div className="flex items-center bg-white px-4 py-2 rounded-full border-2 border-blue-500 shadow-md gap-2">
+                                <IconTime />
+                                <span className="text-xl font-black text-blue-800">{timer}s</span>
+                            </div>
+                        </div>
+                        <div className="flex-1 grid grid-cols-4 gap-2 p-2 content-center">
+                            {cards.map((card, idx) => {
+                                const isFlipped = flippedIndices.includes(idx) || matchedIds.includes(card.matchId);
+                                const isMatched = matchedIds.includes(card.matchId);
+                                return (
+                                    <div key={idx} className={`flip-card aspect-square cursor-pointer ${isFlipped ? 'flipped' : ''}`} onClick={() => handleCardClick(idx)}>
+                                        <div className="flip-card-inner">
+                                            <div className="flip-card-front">
+                                                <div className="w-8 h-8 opacity-50"><IconMemoryBread /></div>
+                                            </div>
+                                            <div className={`flip-card-back ${isMatched ? 'bg-green-100 border-green-500' : ''}`}>
+                                                <span className="text-2xl font-bold text-gray-800">{card.content}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="flex flex-col h-full relative">
+                    <div className="flex justify-between items-center p-4">
+                        <button onClick={onBack} className="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold border-b-2 border-red-800">退出</button>
+                        <div className="flex items-center bg-yellow-100 px-4 py-2 rounded-full border-2 border-yellow-500 shadow-md">
+                            <IconDorayaki />
+                            <span className="ml-2 text-xl font-black text-yellow-800">{score}</span>
+                        </div>
+                    </div>
+
+                    <div className="w-full px-8 mb-4">
+                        <div className="w-full bg-blue-700/30 rounded-full h-3">
+                            <div className="bg-yellow-400 h-3 rounded-full transition-all duration-500" style={{width: `${((currentQIndex + 1) / questions.length) * 100}%`}}></div>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 flex flex-col items-center justify-start pt-2">
+                        <div className="relative mb-6 group cursor-pointer" onClick={() => levelMode===4 ? speak(currentQ.word) : (levelMode===1 ? speak(currentQ.answer) : (levelMode===3 ? speak(currentQ.word) : speak(currentQ.question)))}>
+                            <div className={`w-32 h-32 bg-white rounded-3xl border-4 border-blue-600 flex items-center justify-center shadow-xl ${feedback === 'wrong' ? 'shake border-red-500' : ''} ${feedback === 'correct' ? 'border-green-500 transform scale-110 transition-transform' : ''}`}>
+                                {levelMode === 1 && <span className="text-5xl text-blue-500">🔊</span>}
+                                {levelMode === 2 && <span className="text-6xl font-bold text-gray-800 font-serif">{currentQ.question}</span>}
+                                {(levelMode === 3 || levelMode === 4) && <span className="text-6xl font-bold text-gray-800">{currentQ.word}</span>}
+                            </div>
+                        </div>
+
+                        {levelMode === 4 && (
+                            <div className="mb-6 flex gap-2">
+                                {currentQ.parts.map((_, i) => (
+                                    <div key={i} className="w-12 h-12 bg-black/20 rounded-lg border-2 border-white/50 flex items-center justify-center">
+                                        <span className="text-2xl text-white font-bold">{pinyinSlots[i] || ''}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {levelMode === 3 && <p className="text-white text-lg mb-4 font-bold bg-black/20 px-4 py-1 rounded-full">這是第幾聲？</p>}
+
+                        <div className={`grid ${levelMode === 4 ? 'grid-cols-4' : 'grid-cols-2'} gap-3 w-full max-w-md px-6 pb-6`}>
+                            {levelMode === 4 
+                                ? currentQ.options.map((opt, idx) => (
+                                    <button key={idx} onClick={() => handlePinyinClick(opt)} className="h-16 bg-white rounded-xl text-2xl font-bold shadow-md border-b-4 border-orange-200 active:border-b-0 active:translate-y-1 text-orange-600">
+                                        {opt}
+                                    </button>
+                                  ))
+                                : (() => {
+                                    let options = [];
+                                    if (levelMode <= 2) options = [currentQ.answer, ...currentQ.distractors].sort();
+                                    else if (levelMode === 3) options = [currentQ.answerType, ...currentQ.distractors].sort();
+                                    
+                                    return options.map((opt, idx) => {
+                                        let display = opt;
+                                        if (levelMode === 3) display = opt === 1 ? '一聲' : toneSymbols[opt];
+                                        
+                                        let btnStyle = "bg-white text-blue-600 border-b-4 border-gray-300";
+                                        if (feedback === 'correct' && ((levelMode <= 2 && opt === currentQ.answer) || (levelMode === 3 && opt === currentQ.answerType))) {
+                                            btnStyle = "bg-green-500 text-white border-b-4 border-green-700 scale-105";
+                                        } else if (feedback === 'wrong' && opt === selectedOption) {
+                                            btnStyle = "bg-red-500 text-white border-b-4 border-red-700";
+                                        }
+
+                                        return (
+                                            <button key={idx} onClick={() => handleOptionClick(opt)} disabled={!!feedback} className={`h-24 rounded-2xl text-4xl font-bold shadow-md transition-all active:scale-95 flex items-center justify-center ${btnStyle}`}>
+                                                {display}
+                                            </button>
+                                        );
+                                    })
+                                })()
+                            }
+                        </div>
+                        {levelMode === 4 && <div className="text-white/80 text-sm">請依序點選注音</div>}
+                    </div>
+                </div>
+            );
+        };
+
+        const ResultScreen = ({ score, levelMode, onRestart, onHome }) => {
+            const [highScore, setHighScore] = useState(false);
+            const [newLevelRecord, setNewLevelRecord] = useState(false);
+
+            useEffect(() => {
+                const savedScores = JSON.parse(localStorage.getItem('doraemon_level_highscores') || '{}');
+                const currentHigh = savedScores[levelMode];
+
+                let isNewRecord = false;
+                if (levelMode === 5) {
+                    if (!currentHigh || score < currentHigh) isNewRecord = true;
+                } else {
+                    if (!currentHigh || score > currentHigh) isNewRecord = true;
+                }
+
+                if (isNewRecord) {
+                    savedScores[levelMode] = score;
+                    localStorage.setItem('doraemon_level_highscores', JSON.stringify(savedScores));
+                    setNewLevelRecord(true);
+                }
+            }, [score, levelMode]);
+
+            return (
+                <div className="flex flex-col items-center justify-center h-full p-6 animate-fade-in text-center">
+                    <h2 className="text-4xl font-black text-white mb-6 drop-shadow-md">挑戰結束！</h2>
+                    
+                    <div className="bg-white p-8 rounded-3xl shadow-2xl border-4 border-yellow-400 mb-8 w-full max-w-sm relative">
+                        {newLevelRecord && (
+                            <div className="absolute -top-6 -right-6 bg-red-500 text-white font-bold py-2 px-4 rounded-full border-2 border-white rotate-12 animate-bounce-custom z-10">
+                                新紀錄！
+                            </div>
+                        )}
+                        <p className="text-gray-500 text-xl mb-2 font-bold">{levelMode === 5 ? '花費時間' : '獲得銅鑼燒'}</p>
+                        <div className="flex items-center justify-center gap-2">
+                             {levelMode === 5 ? <IconTime/> : <IconDorayaki />}
+                             <span className="text-6xl font-black text-yellow-600">
+                                {score}{levelMode === 5 ? <span className="text-2xl">秒</span> : ''}
+                             </span>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col w-full max-w-xs gap-4">
+                        <button onClick={onRestart} className="bg-green-500 text-white text-xl font-bold py-4 rounded-full border-b-4 border-green-700 active:border-b-0 active:translate-y-1 shadow-lg">
+                            再玩一次
+                        </button>
+                        <button onClick={onHome} className="bg-blue-600 text-white text-xl font-bold py-3 rounded-full border-b-4 border-blue-800 active:border-b-0 active:translate-y-1 shadow-lg">
+                            回主畫面
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        const Leaderboard = ({ onBack }) => {
+            const [highScores, setHighScores] = useState({});
+            useEffect(() => {
+                setHighScores(JSON.parse(localStorage.getItem('doraemon_level_highscores') || '{}'));
+            }, []);
+
+            return (
+                <div className="flex flex-col items-center h-full p-6 pt-12">
+                     <button onClick={onBack} className="self-start mb-4 bg-white/20 p-2 rounded-full text-white hover:bg-white/30">⬅ 回首頁</button>
+                    <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border-4 border-yellow-500">
+                        <div className="bg-yellow-400 p-4 text-center border-b-4 border-yellow-500">
+                            <h2 className="text-2xl font-black text-yellow-900 flex items-center justify-center gap-2"><IconDorayaki /> 榮譽榜</h2>
+                        </div>
+                        <div className="p-4 wood-pattern min-h-[300px] flex flex-col gap-3">
+                            {[1,2,3,4,5].map(lvl => (
+                                <div key={lvl} className="bg-white p-3 rounded-xl border-2 border-gray-200 flex justify-between items-center shadow-sm">
+                                    <span className="font-bold text-gray-600">Level {lvl} {lvl===5?'(秒)':'(分)'}</span>
+                                    <span className="text-2xl font-black text-orange-500">{highScores[lvl] || '-'}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const TeachingSection = ({ onBack }) => (
+            <div className="flex flex-col items-center h-full p-4 pt-10 overflow-y-auto">
+                <div className="w-full max-w-md flex justify-between items-center mb-6">
+                    <button onClick={onBack} className="bg-white/20 p-2 rounded-full text-white hover:bg-white/30 backdrop-blur-sm">⬅ 回首頁</button>
+                    <h2 className="text-3xl font-bold text-white drop-shadow-md">注音教室</h2>
+                    <div className="w-10"></div>
+                </div>
+                <div className="bg-white/10 p-4 rounded-3xl w-full max-w-md mb-8">
+                     <p className="text-white text-center mb-4 font-bold bg-black/20 rounded-full py-1">點擊注音聽發音</p>
+                     <div className="grid grid-cols-4 gap-3">
+                        {zhuyinSymbolsPool.map((symbol) => (
+                            <button key={symbol} onClick={() => speak(symbol)} className="aspect-square bg-white rounded-xl shadow-lg border-b-4 border-gray-200 active:border-b-0 active:translate-y-1 active:shadow-inner flex items-center justify-center text-4xl font-bold text-blue-600 hover:bg-yellow-50 hover:text-blue-700 transition-all">{symbol}</button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        );
+
+        // --- NEW: Story Generator Component ---
+        const StoryGenerator = ({ onBack }) => {
+            const [selectedWords, setSelectedWords] = useState([]);
+            const [availableWords, setAvailableWords] = useState([]);
+            const [story, setStory] = useState("");
+            const [isLoading, setIsLoading] = useState(false);
+
+            useEffect(() => {
+                shuffleWords();
+            }, []);
+
+            const shuffleWords = () => {
+                const words = [...readingPool].sort(() => 0.5 - Math.random()).slice(0, 24);
+                setAvailableWords(words);
+                setSelectedWords([]); 
+                setStory(""); 
+            };
+
+            const toggleWord = (word) => {
+                if (selectedWords.includes(word)) {
+                    setSelectedWords(prev => prev.filter(w => w !== word));
+                } else {
+                    if (selectedWords.length < 5) { 
+                        setSelectedWords(prev => [...prev, word]);
+                    }
+                }
+            };
+
+            const handleGenerate = async () => {
+                setIsLoading(true);
+                setStory("");
+                const result = await generateStory(selectedWords);
+                setStory(result);
+                setIsLoading(false);
+                speak(result);
+            };
+
+            return (
+                <div className="flex flex-col items-center h-full p-4 pt-10 overflow-y-auto">
+                    <div className="w-full max-w-md flex justify-between items-center mb-4">
+                        <button onClick={onBack} className="bg-white/20 p-2 rounded-full text-white hover:bg-white/30 backdrop-blur-sm">⬅ 回首頁</button>
+                        <h2 className="text-2xl font-bold text-white drop-shadow-md">✨ AI 故事機</h2>
+                        <div className="w-10"></div>
+                    </div>
+
+                    {!story ? (
+                        <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-xl border-4 border-purple-300">
+                            <div className="flex justify-between items-center mb-4">
+                                <p className="text-gray-700 font-bold text-lg">選 1~5 個喜歡的詞</p>
+                                <button onClick={shuffleWords} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1">
+                                    <IconShuffle /> 換一批
+                                </button>
+                            </div>
+                            
+                            <div className="grid grid-cols-4 gap-2 mb-6 max-h-64 overflow-y-auto p-1">
+                                {availableWords.map((item, idx) => (
+                                    <button 
+                                        key={idx} 
+                                        onClick={() => toggleWord(item.q)}
+                                        className={`p-2 rounded-lg border-2 font-bold text-lg transition-all ${selectedWords.includes(item.q) ? 'bg-purple-500 text-white border-purple-700 transform scale-105 shadow-md' : 'bg-gray-100 text-gray-600 border-gray-200'}`}
+                                    >
+                                        {item.q}
+                                    </button>
+                                ))}
+                            </div>
+                            
+                            <button 
+                                onClick={handleGenerate}
+                                disabled={selectedWords.length === 0 || isLoading}
+                                className={`w-full py-4 rounded-xl font-bold text-xl shadow-lg border-b-4 transition-all flex items-center justify-center gap-2 ${selectedWords.length === 0 ? 'bg-gray-300 text-gray-500 border-gray-400' : 'bg-yellow-400 text-yellow-900 border-yellow-600 hover:bg-yellow-500 active:border-b-0 active:translate-y-1'}`}
+                            >
+                                {isLoading ? (
+                                    <span className="animate-pulse">變身中...</span>
+                                ) : (
+                                    <>✨ 變出故事 (已選 {selectedWords.length} 個)</>
+                                )}
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-xl border-4 border-yellow-400 relative">
+                            <div className="absolute -top-6 -right-2 bg-purple-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md animate-bounce-custom">
+                                故事完成！
+                            </div>
+                            <div className="bg-yellow-50 p-4 rounded-xl border-2 border-yellow-100 mb-4 min-h-[150px] flex items-center justify-center">
+                                <p className="text-xl font-medium text-gray-800 leading-relaxed text-justify">{story}</p>
+                            </div>
+                            <div className="flex gap-3">
+                                <button onClick={() => speak(story)} className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl border-b-4 border-green-700 active:border-b-0 active:translate-y-1">
+                                    🔊 再聽一次
+                                </button>
+                                <button onClick={() => {setStory(""); setSelectedWords([]);}} className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-xl border-b-4 border-blue-700 active:border-b-0 active:translate-y-1">
+                                    🔄 再玩一次
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [screen, setScreen] = useState('menu'); 
+            const [levelMode, setLevelMode] = useState(1);
+            const [finalScore, setFinalScore] = useState(0);
+
+            const startLevel = (mode) => {
+                setLevelMode(mode);
+                setScreen('playing');
+            };
+
+            const handleEndGame = (score) => {
+                setFinalScore(score);
+                setScreen('result');
+            };
+
+            return (
+                <div className="h-screen w-screen max-w-lg mx-auto bg-blue-400 relative shadow-2xl overflow-hidden sm:rounded-xl sm:my-8 sm:h-[90vh]">
+                    <div className="absolute top-[-50px] right-[-50px] w-40 h-40 bg-white/10 rounded-full blur-xl"></div>
+                    <div className="absolute bottom-[-20px] left-[-20px] w-32 h-32 bg-white/10 rounded-full blur-xl"></div>
+
+                    {screen === 'menu' && <MainMenu onStart={() => setScreen('select')} onLeaderboard={() => setScreen('leaderboard')} onTeaching={() => setScreen('teaching')} onStory={() => setScreen('story')} />}
+                    {screen === 'select' && <LevelSelect onSelectLevel={startLevel} onBack={() => setScreen('menu')} />}
+                    {screen === 'playing' && <GameScreen levelMode={levelMode} onEndGame={handleEndGame} onBack={() => setScreen('menu')} />}
+                    {screen === 'result' && <ResultScreen score={finalScore} levelMode={levelMode} onRestart={() => setScreen('select')} onHome={() => setScreen('menu')} />}
+                    {screen === 'leaderboard' && <Leaderboard onBack={() => setScreen('menu')} />}
+                    {screen === 'teaching' && <TeachingSection onBack={() => setScreen('menu')} />}
+                    {screen === 'story' && <StoryGenerator onBack={() => setScreen('menu')} />}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
