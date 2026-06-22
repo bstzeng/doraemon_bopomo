@@ -7,6 +7,14 @@
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script>
+        // 強制 Babel 使用傳統的 React.createElement，避免自動編譯出 import 語法導致瀏覽器報錯
+        Babel.registerPreset('react-classic', {
+            presets: [
+                [Babel.availablePresets['react'], { "runtime": "classic" }]
+            ]
+        });
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -38,6 +46,21 @@
             20%, 80% { transform: translate3d(2px, 0, 0); }
             30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
             40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+        .pop-up-celebrate {
+            animation: popUpCelebrate 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes popUpCelebrate {
+            0% { transform: scale(0) translateY(100px); opacity: 0; }
+            60% { transform: scale(1.1) translateY(-20px); opacity: 1; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .clap-hands {
+            animation: clap 0.3s infinite alternate;
+        }
+        @keyframes clap {
+            from { transform: rotate(-5deg); }
+            to { transform: rotate(5deg); }
         }
         .flip-card {
             perspective: 1000px;
@@ -87,7 +110,7 @@
 <body>
     <div id="root"></div>
 
-    <script type="text/babel">
+    <script type="text/babel" data-presets="react-classic,env">
         const { useState, useEffect, useRef, useMemo } = React;
         const apiKey = ""; // API key injected by environment
 
@@ -186,7 +209,6 @@
 
         const toneSymbols = { 1: '一聲', 2: 'ˊ', 3: 'ˇ', 4: 'ˋ', 5: '˙' };
 
-        // Helper for Level 4
         const decomposeZhuyin = (zhuyinStr) => {
             if (!zhuyinStr) return [' ', ' ', ' '];
             const toneMap = { 'ˊ': 'ˊ', 'ˇ': 'ˇ', 'ˋ': 'ˋ', '˙': '˙' };
@@ -252,6 +274,88 @@
             <svg viewBox="0 0 24 24" className="w-6 h-6"><path d="M10.59 9.17L5.41 4L4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" fill="currentColor"/></svg>
         );
 
+        // Character Heads for Celebration
+        const CharacterHead = ({ type }) => {
+            const commonProps = "w-40 h-40 drop-shadow-xl animate-bounce-custom";
+            if (type === 'nobita') {
+                return (
+                    <svg viewBox="0 0 200 200" className={commonProps}>
+                        <circle cx="100" cy="100" r="90" fill="#FFE0BD" stroke="#333" strokeWidth="3"/>
+                        <path d="M 10 90 C 10 20, 190 20, 190 90 L 190 60 C 170 10, 30 10, 10 60 Z" fill="#222"/>
+                        <path d="M 20 60 C 20 20, 180 20, 180 60 C 180 80, 160 90, 140 85 C 130 95, 70 95, 60 85 C 40 90, 20 80, 20 60" fill="#222"/>
+                        <circle cx="65" cy="105" r="30" fill="white" stroke="#333" strokeWidth="4"/>
+                        <circle cx="135" cy="105" r="30" fill="white" stroke="#333" strokeWidth="4"/>
+                        <line x1="95" y1="105" x2="105" y2="105" stroke="#333" strokeWidth="4"/>
+                        <circle cx="65" cy="105" r="3" fill="#333"/>
+                        <circle cx="135" cy="105" r="3" fill="#333"/>
+                        <path d="M 70 150 Q 100 170 130 150" fill="none" stroke="#333" strokeWidth="4" strokeLinecap="round"/>
+                    </svg>
+                );
+            }
+            if (type === 'shizuka') {
+                return (
+                     <svg viewBox="0 0 200 200" className={commonProps}>
+                        <path d="M 10 130 Q -10 160 20 180 Q 40 160 30 130 Z" fill="#222"/>
+                        <path d="M 190 130 Q 210 160 180 180 Q 160 160 170 130 Z" fill="#222"/>
+                        <ellipse cx="100" cy="105" rx="85" ry="90" fill="#FFE0BD" stroke="#333" strokeWidth="3"/>
+                        <path d="M 15 100 C 15 10, 185 10, 185 100 C 185 110, 170 120, 160 100 C 150 70, 50 70, 40 100 C 30 120, 15 110, 15 100" fill="#222"/>
+                        <ellipse cx="65" cy="110" rx="12" ry="18" fill="white" stroke="#333" strokeWidth="2"/>
+                        <ellipse cx="135" cy="110" rx="12" ry="18" fill="white" stroke="#333" strokeWidth="2"/>
+                        <ellipse cx="65" cy="110" rx="6" ry="10" fill="#333"/>
+                        <ellipse cx="135" cy="110" rx="6" ry="10" fill="#333"/>
+                        <circle cx="68" cy="106" r="3" fill="white"/>
+                        <circle cx="138" cy="106" r="3" fill="white"/>
+                        <path d="M 80 150 Q 100 160 120 150" fill="none" stroke="#333" strokeWidth="3" strokeLinecap="round"/>
+                        <path d="M 60 180 Q 100 210 140 180" fill="#FFB6C1" stroke="none"/>
+                    </svg>
+                );
+            }
+            if (type === 'gian') {
+                return (
+                     <svg viewBox="0 0 200 200" className={commonProps}>
+                        <path d="M 20 80 Q 20 20 100 20 Q 180 20 180 80 L 180 140 Q 180 190 100 190 Q 20 190 20 140 Z" fill="#F5CBA7" stroke="#333" strokeWidth="3"/>
+                        <path d="M 20 80 L 30 60 L 40 75 L 50 55 L 60 70 L 70 50 L 80 65 L 90 45 L 100 60 L 110 45 L 120 65 L 130 50 L 140 70 L 150 55 L 160 75 L 170 60 L 180 80" fill="#222" stroke="#222" strokeWidth="1"/>
+                        <path d="M 20 80 Q 100 60 180 80" fill="#222"/> 
+                        <line x1="50" y1="100" x2="80" y2="110" stroke="#333" strokeWidth="4" strokeLinecap="round"/>
+                        <line x1="150" y1="100" x2="120" y2="110" stroke="#333" strokeWidth="4" strokeLinecap="round"/>
+                        <circle cx="65" cy="115" r="4" fill="#333"/>
+                        <circle cx="135" cy="115" r="4" fill="#333"/>
+                        <path d="M 90 130 Q 100 120 110 130" fill="none" stroke="#333" strokeWidth="3"/>
+                        <path d="M 50 150 Q 100 190 150 150" fill="#A52A2A" stroke="#333" strokeWidth="3"/>
+                        <path d="M 50 150 Q 100 190 150 150" fill="none" stroke="#333" strokeWidth="3"/>
+                    </svg>
+                );
+            }
+            if (type === 'suneo') {
+                return (
+                     <svg viewBox="0 0 200 200" className={commonProps}>
+                        <path d="M 30 80 L 80 80 L 100 20 L 130 80 L 170 50 L 160 100 L 190 90 L 170 130" fill="#222" stroke="#222" strokeWidth="2"/>
+                        <path d="M 30 80 Q 100 80 170 130 Q 140 190 100 190 Q 50 190 30 130 Z" fill="#FFE0BD" stroke="#333" strokeWidth="3"/>
+                        <path d="M 60 110 Q 75 100 90 110" fill="none" stroke="#333" strokeWidth="3"/>
+                        <path d="M 120 110 Q 135 100 150 110" fill="none" stroke="#333" strokeWidth="3"/>
+                        <circle cx="75" cy="115" r="3" fill="#333"/>
+                        <circle cx="135" cy="115" r="3" fill="#333"/>
+                        <path d="M 80 150 L 110 160 L 140 150" fill="none" stroke="#333" strokeWidth="3" strokeLinecap="round"/>
+                        <path d="M 90 153 L 130 153" fill="#FFFF00" opacity="0.3"/> 
+                    </svg>
+                );
+            }
+            return null;
+        };
+
+        const CelebrationOverlay = ({ character }) => {
+            return (
+                <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm pointer-events-none">
+                    <div className="pop-up-celebrate flex flex-col items-center">
+                        <CharacterHead type={character} />
+                        <div className="text-white text-4xl font-black mt-4 drop-shadow-lg clap-hands bg-yellow-400 text-yellow-900 px-6 py-2 rounded-full border-4 border-white">
+                            好棒喔！
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         // --- Audio Helper ---
         const speak = (text) => {
             if ('speechSynthesis' in window) {
@@ -279,14 +383,14 @@
                     })
                 });
                 
-                if (!response.ok) throw new Error('API Error');
+                if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
                 
                 const data = await response.json();
                 const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
                 return text || "哆啦A夢現在想不到故事，稍後再試試看吧！";
             } catch (error) {
                 console.error("Gemini Error:", error);
-                return "機器貓的線路好像有點怪怪的，請檢查網路，或者稍後再試試看喔！";
+                return "糟糕！機器貓的百寶袋好像卡住了，或者網路不太穩定，請等一下再試試看喔！";
             }
         };
 
@@ -399,6 +503,7 @@
             const [questions, setQuestions] = useState([]);
             const [feedback, setFeedback] = useState(null); 
             const [selectedOption, setSelectedOption] = useState(null);
+            const [showCelebration, setShowCelebration] = useState(null);
             
             // Level 4 Specific
             const [pinyinSlots, setPinyinSlots] = useState([]); 
@@ -420,6 +525,7 @@
                 setMatchedIds([]);
                 setTimer(0);
                 setPinyinSlots([]);
+                setShowCelebration(null);
                 if (timerRef.current) clearInterval(timerRef.current);
 
                 if (levelMode === 1) {
@@ -500,6 +606,13 @@
                 return <div className="text-white text-2xl p-10 text-center font-bold animate-pulse">機器貓正在準備道具...</div>;
             }
 
+            const triggerCelebration = () => {
+                const chars = ['nobita', 'shizuka', 'gian', 'suneo'];
+                const randomChar = chars[Math.floor(Math.random() * chars.length)];
+                setShowCelebration(randomChar);
+                setTimeout(() => setShowCelebration(null), 2000);
+            };
+
             const handleOptionClick = (opt) => {
                 if (feedback) return;
                 setSelectedOption(opt);
@@ -512,6 +625,7 @@
                     setFeedback('correct');
                     speak("答對了！");
                     setScore(s => s + 10);
+                    triggerCelebration();
                 } else {
                     setFeedback('wrong');
                     speak("再接再厲！");
@@ -525,7 +639,7 @@
                     } else {
                         onEndGame(score + (isCorrect ? 10 : 0));
                     }
-                }, 1500);
+                }, 2000);
             };
 
             const handlePinyinClick = (val) => {
@@ -542,6 +656,7 @@
                         setFeedback('correct');
                         speak("答對了！");
                         setScore(s => s + 20); 
+                        triggerCelebration();
                         setTimeout(() => {
                             if (currentQIndex < questions.length - 1) {
                                 setCurrentQIndex(prev => prev + 1);
@@ -550,7 +665,7 @@
                             } else {
                                 onEndGame(score + 20);
                             }
-                        }, 1500);
+                        }, 2000);
                     } else {
                         setFeedback('wrong');
                         speak("不對喔");
@@ -578,10 +693,11 @@
                             setMatchedIds(prev => [...prev, card1.matchId]);
                             setFlippedIndices([]);
                             speak("好棒！");
+                            triggerCelebration();
                             
                             if (matchedIds.length + 1 === cards.length / 2) {
                                 clearInterval(timerRef.current);
-                                setTimeout(() => onEndGame(timer), 1000);
+                                setTimeout(() => onEndGame(timer), 2000);
                             }
                         }, 800);
                     } else {
@@ -595,6 +711,7 @@
             if (levelMode === 5) {
                 return (
                     <div className="flex flex-col h-full relative">
+                        {showCelebration && <CelebrationOverlay character={showCelebration} />}
                         <div className="flex justify-between items-center p-4">
                             <button onClick={onBack} className="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold border-b-2 border-red-800">退出</button>
                             <div className="flex items-center bg-white px-4 py-2 rounded-full border-2 border-blue-500 shadow-md gap-2">
@@ -624,8 +741,20 @@
                 );
             }
 
+            const playSound = () => {
+                 if (levelMode === 1) speak(currentQ.answer);
+                 if (levelMode === 3) speak(currentQ.word);
+                 if (levelMode === 2) speak(currentQ.question); 
+            };
+
+            const progressStyle = { width: `${((currentQIndex + 1) / questions.length) * 100}%` };
+
             return (
                 <div className="flex flex-col h-full relative">
+                    {/* Celebration Overlay */}
+                    {showCelebration && <CelebrationOverlay character={showCelebration} />}
+
+                    {/* Header */}
                     <div className="flex justify-between items-center p-4">
                         <button onClick={onBack} className="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold border-b-2 border-red-800">退出</button>
                         <div className="flex items-center bg-yellow-100 px-4 py-2 rounded-full border-2 border-yellow-500 shadow-md">
@@ -634,14 +763,17 @@
                         </div>
                     </div>
 
+                    {/* Progress */}
                     <div className="w-full px-8 mb-4">
                         <div className="w-full bg-blue-700/30 rounded-full h-3">
-                            <div className="bg-yellow-400 h-3 rounded-full transition-all duration-500" style={{width: `${((currentQIndex + 1) / questions.length) * 100}%`}}></div>
+                            <div className="bg-yellow-400 h-3 rounded-full transition-all duration-500" style={progressStyle}></div>
                         </div>
                     </div>
 
+                    {/* Content */}
                     <div className="flex-1 flex flex-col items-center justify-start pt-2">
-                        <div className="relative mb-6 group cursor-pointer" onClick={() => levelMode===4 ? speak(currentQ.word) : (levelMode===1 ? speak(currentQ.answer) : (levelMode===3 ? speak(currentQ.word) : speak(currentQ.question)))}>
+                        {/* Display Area */}
+                        <div className="relative mb-6 group cursor-pointer" onClick={playSound}>
                             <div className={`w-32 h-32 bg-white rounded-3xl border-4 border-blue-600 flex items-center justify-center shadow-xl ${feedback === 'wrong' ? 'shake border-red-500' : ''} ${feedback === 'correct' ? 'border-green-500 transform scale-110 transition-transform' : ''}`}>
                                 {levelMode === 1 && <span className="text-5xl text-blue-500">🔊</span>}
                                 {levelMode === 2 && <span className="text-6xl font-bold text-gray-800 font-serif">{currentQ.question}</span>}
@@ -649,6 +781,7 @@
                             </div>
                         </div>
 
+                        {/* Level 4: Pinyin Slots */}
                         {levelMode === 4 && (
                             <div className="mb-6 flex gap-2">
                                 {currentQ.parts.map((_, i) => (
@@ -661,6 +794,7 @@
 
                         {levelMode === 3 && <p className="text-white text-lg mb-4 font-bold bg-black/20 px-4 py-1 rounded-full">這是第幾聲？</p>}
 
+                        {/* Input Area */}
                         <div className={`grid ${levelMode === 4 ? 'grid-cols-4' : 'grid-cols-2'} gap-3 w-full max-w-md px-6 pb-6`}>
                             {levelMode === 4 
                                 ? currentQ.options.map((opt, idx) => (
